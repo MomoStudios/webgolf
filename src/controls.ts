@@ -8,6 +8,7 @@ export class ControlsManager {
   private raycaster: THREE.Raycaster;
   private mouse: THREE.Vector2;
   private aimLine: THREE.Line | null = null;
+  private getBallPosition: () => THREE.Vector3;
   
   public controls: Controls = {
     isDragging: false,
@@ -22,12 +23,14 @@ export class ControlsManager {
     canvas: HTMLCanvasElement, 
     camera: THREE.Camera, 
     scene: THREE.Scene,
-    onPutt: (power: number, direction: THREE.Vector2) => void
+    onPutt: (power: number, direction: THREE.Vector2) => void,
+    getBallPosition: () => THREE.Vector3
   ) {
     this.canvas = canvas;
     this.camera = camera;
     this.scene = scene;
     this.onPutt = onPutt;
+    this.getBallPosition = getBallPosition;
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
 
@@ -81,7 +84,10 @@ export class ControlsManager {
 
   private handleTouchEnd(event: TouchEvent): void {
     event.preventDefault();
-    this.endDrag();
+    // Only fire endDrag when all fingers have been lifted
+    if (event.touches.length === 0) {
+      this.endDrag();
+    }
   }
 
   private startDrag(clientX: number, clientY: number): void {
@@ -132,7 +138,9 @@ export class ControlsManager {
     const power = Math.min(dragVector.length() / 50, this.controls.maxPower);
     const lineLength = power * 0.5;
 
-    const start = new THREE.Vector3(-4, 0.2, 2); // Ball start position
+    // Read the ball's current position dynamically
+    const ballPos = this.getBallPosition();
+    const start = new THREE.Vector3(ballPos.x, ballPos.y + 0.1, ballPos.z);
     const end = start.clone().add(direction.multiplyScalar(lineLength));
 
     this.showAimLine(start, end, power);

@@ -39,12 +39,13 @@ class Game {
     // Setup physics world to match visual course
     await this.setupPhysics();
 
-    // Initialize controls
+    // Initialize controls — pass getBallPosition so aim line tracks the ball dynamically
     this.controlsManager = new ControlsManager(
       canvas,
       this.sceneManager.camera,
       this.sceneManager.scene,
-      this.handlePutt.bind(this)
+      this.handlePutt.bind(this),
+      () => this.course.getBallPosition()
     );
 
     // Show initial message
@@ -64,12 +65,9 @@ class Game {
     await this.physicsManager.createWall(-6.05, 0.25, 0, 0.1, 0.5, 8.1);  // Left
     await this.physicsManager.createWall(6.05, 0.25, 0, 0.1, 0.5, 8.1);   // Right
     
-    // Curved obstacles
-    await this.physicsManager.createWall(-4, 0.25, -2, 1.6, 0.5, 1.6);
-    await this.physicsManager.createWall(3, 0.25, 1, 1.2, 0.5, 1.2);
-
-    // Create hole sensor
-    await this.physicsManager.createHole(4, 0.1, -2);
+    // Curved obstacles (cylinder physics to match visual cylinders)
+    await this.physicsManager.createObstacle(-4, 0.25, -2, 0.8);
+    await this.physicsManager.createObstacle(3, 0.25, 1, 0.6);
 
     // Create ball
     await this.physicsManager.createBall(-4, 0.2, 2);
@@ -138,9 +136,9 @@ class Game {
   }
 }
 
-// Initialize game when page loads
+// Initialize game when page loads and store on window for debugging
 window.addEventListener('load', () => {
-  new Game();
+  window.game = new Game();
 });
 
 // Expose game globally for debugging
