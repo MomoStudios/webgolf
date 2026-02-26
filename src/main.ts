@@ -121,9 +121,13 @@ class Game {
         return;
       }
 
-      // Out of bounds
+      // Out of bounds — penalty stroke, reset ball to tee
       if (isBallOutOfBounds(this.ball)) {
-        this.resetCourse();
+        this.sm.strokes++;
+        this.hud.updateStrokeCount(this.sm.strokes);
+        this.hud.showMessage('Out of Bounds! +1 stroke', 2000);
+        this.ball.reset(hole01.tee.x, 0.15, hole01.tee.z);
+        transition(this.sm, GameStateKind.Idle);
         return;
       }
     }
