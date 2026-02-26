@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "@types/three": "^0.168.0",
+    "@types/three": "^0.183.1",
     "typescript": "^5.3.3",
     "vite": "^5.0.8",
     "vite-plugin-top-level-await": "^1.6.0",
@@ -17,6 +17,6 @@
   },
   "dependencies": {
     "@dimforge/rapier3d": "^0.19.3",
-    "three": "^0.168.0"
+    "three": "^0.183.1"
   }
 }
