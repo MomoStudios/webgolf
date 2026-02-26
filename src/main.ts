@@ -27,32 +27,37 @@ class Game {
   }
 
   private async init(): Promise<void> {
-    const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-    
-    // Initialize managers
-    this.sceneManager = new SceneManager(canvas);
-    this.physicsManager = new PhysicsManager();
-    await this.physicsManager.initialize();
-    this.course = new Course(this.sceneManager.scene);
-    this.uiManager = new UIManager();
+    try {
+      const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+      
+      // Initialize managers
+      this.sceneManager = new SceneManager(canvas);
+      this.physicsManager = new PhysicsManager();
+      await this.physicsManager.initialize();
+      this.course = new Course(this.sceneManager.scene);
+      this.uiManager = new UIManager();
 
-    // Setup physics world to match visual course
-    await this.setupPhysics();
+      // Setup physics world to match visual course
+      await this.setupPhysics();
 
-    // Initialize controls — pass getBallPosition so aim line tracks the ball dynamically
-    this.controlsManager = new ControlsManager(
-      canvas,
-      this.sceneManager.camera,
-      this.sceneManager.scene,
-      this.handlePutt.bind(this),
-      () => this.course.getBallPosition()
-    );
+      // Initialize controls — pass getBallPosition so aim line tracks the ball dynamically
+      this.controlsManager = new ControlsManager(
+        canvas,
+        this.sceneManager.camera,
+        this.sceneManager.scene,
+        this.handlePutt.bind(this),
+        () => this.course.getBallPosition()
+      );
 
-    // Show initial message
-    this.uiManager.showMessage('Drag from the ball to aim and release to putt!', 4000);
+      // Show initial message
+      this.uiManager.showMessage('Drag from the ball to aim and release to putt!', 4000);
 
-    // Start game loop
-    this.gameLoop();
+      // Start game loop
+      this.gameLoop();
+    } catch (e) {
+      console.error('Game init failed:', e);
+      document.body.innerHTML = `<div style="color:white;padding:20px;font-family:sans-serif"><h1>Init Error</h1><pre>${e}</pre></div>`;
+    }
   }
 
   private async setupPhysics(): Promise<void> {

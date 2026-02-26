@@ -10,6 +10,10 @@ export class PhysicsManager {
   public async initialize(): Promise<void> {
     // Cache RAPIER module reference once during initialization
     this.RAPIER = await import('@dimforge/rapier3d');
+    // WASM must be initialized before using any Rapier constructors
+    if (typeof this.RAPIER.init === 'function') {
+      await this.RAPIER.init();
+    }
     // Initialize physics world with gravity
     this.world = new this.RAPIER.World(new this.RAPIER.Vector3(0.0, -9.81, 0.0));
   }
