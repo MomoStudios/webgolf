@@ -84,7 +84,7 @@ class Game {
     }
 
     // Convert 2D direction to 3D physics impulse
-    const impulseStrength = power * 0.8;
+    const impulseStrength = power * 0.2;
     const impulseX = direction.x * impulseStrength;
     const impulseZ = direction.y * impulseStrength;
 
