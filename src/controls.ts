@@ -110,7 +110,29 @@ export class ControlsManager {
     const power = Math.min(dragVector.length() / 50, this.controls.maxPower);
     
     if (power > 0.5) { // Minimum power threshold
-      const direction = dragVector.normalize();
+      // Raycast to get world-space direction (same as aim line)
+      const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      
+      const startNDC = new THREE.Vector2(
+        (this.controls.dragStart.x / window.innerWidth) * 2 - 1,
+        -(this.controls.dragStart.y / window.innerHeight) * 2 + 1
+      );
+      const currentNDC = new THREE.Vector2(
+        (this.controls.dragCurrent.x / window.innerWidth) * 2 - 1,
+        -(this.controls.dragCurrent.y / window.innerHeight) * 2 + 1
+      );
+
+      this.raycaster.setFromCamera(startNDC, this.camera);
+      const startWorld = new THREE.Vector3();
+      this.raycaster.ray.intersectPlane(groundPlane, startWorld);
+
+      this.raycaster.setFromCamera(currentNDC, this.camera);
+      const currentWorld = new THREE.Vector3();
+      this.raycaster.ray.intersectPlane(groundPlane, currentWorld);
+
+      const worldDir = new THREE.Vector3().subVectors(startWorld, currentWorld);
+      worldDir.y = 0;
+      const direction = new THREE.Vector2(worldDir.x, worldDir.z).normalize();
       this.onPutt(power, direction);
     }
 
@@ -127,21 +149,40 @@ export class ControlsManager {
       return;
     }
 
-    // Convert screen coordinates to world coordinates
-    this.mouse.x = (this.controls.dragStart.x / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(this.controls.dragStart.y / window.innerHeight) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+    // Raycast drag start and current positions onto the ground plane (y=0)
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     
-    // Create aim line
-    const direction = new THREE.Vector3(dragVector.x, 0, -dragVector.y).normalize();
+    const startNDC = new THREE.Vector2(
+      (this.controls.dragStart.x / window.innerWidth) * 2 - 1,
+      -(this.controls.dragStart.y / window.innerHeight) * 2 + 1
+    );
+    const currentNDC = new THREE.Vector2(
+      (this.controls.dragCurrent.x / window.innerWidth) * 2 - 1,
+      -(this.controls.dragCurrent.y / window.innerHeight) * 2 + 1
+    );
+
+    this.raycaster.setFromCamera(startNDC, this.camera);
+    const startWorld = new THREE.Vector3();
+    this.raycaster.ray.intersectPlane(groundPlane, startWorld);
+
+    this.raycaster.setFromCamera(currentNDC, this.camera);
+    const currentWorld = new THREE.Vector3();
+    this.raycaster.ray.intersectPlane(groundPlane, currentWorld);
+
+    if (!startWorld || !currentWorld) return;
+
+    // Direction is opposite of drag (slingshot: pull back to shoot forward)
+    const worldDrag = new THREE.Vector3().subVectors(startWorld, currentWorld);
+    worldDrag.y = 0;
+    
     const power = Math.min(dragVector.length() / 50, this.controls.maxPower);
     const lineLength = power * 0.5;
+    const direction = worldDrag.normalize();
 
     // Read the ball's current position dynamically
     const ballPos = this.getBallPosition();
     const start = new THREE.Vector3(ballPos.x, ballPos.y + 0.1, ballPos.z);
-    const end = start.clone().add(direction.multiplyScalar(lineLength));
+    const end = start.clone().add(direction.clone().multiplyScalar(lineLength));
 
     this.showAimLine(start, end, power);
   }

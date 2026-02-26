@@ -18,7 +18,9 @@ export class PhysicsManager {
     const RAPIER = this.RAPIER;
     const ballDesc = RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(x, y, z)
-      .setCcdEnabled(true);
+      .setCcdEnabled(true)
+      .setLinearDamping(1.5)    // Rolling resistance on grass
+      .setAngularDamping(1.0);
     this.ballBody = this.world.createRigidBody(ballDesc);
     
     const ballCollider = RAPIER.ColliderDesc.ball(0.1) // Ball radius
