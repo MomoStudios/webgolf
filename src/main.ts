@@ -89,7 +89,10 @@ class Game {
     }
 
     // Convert 2D direction to 3D physics impulse
-    const impulseStrength = power * 0.0125;
+    // Exponential power curve — fine control for short putts, ramps up for power shots
+    const maxPower = 15;
+    const normalizedPower = power / maxPower; // 0..1
+    const impulseStrength = 0.2 * (normalizedPower * normalizedPower) * maxPower;
     const impulseX = direction.x * impulseStrength;
     const impulseZ = direction.y * impulseStrength;
 
@@ -100,6 +103,8 @@ class Game {
   }
 
   private checkBallInHole(): void {
+    if (this.gameState.ballInHole) return;
+
     const ballPos = this.physicsManager.getBallPosition();
     const holePos = this.course.getHolePosition();
     
@@ -108,8 +113,11 @@ class Game {
       Math.pow(ballPos.z - holePos.z, 2)
     );
 
-    // Check if ball is close enough to hole and moving slowly
-    if (distance < 0.15 && this.physicsManager.isBallStopped() && !this.gameState.ballInHole) {
+    // Ball sinks if it rolls over the hole slowly enough
+    const vel = this.physicsManager.getBallVelocity();
+    const speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+
+    if (distance < 0.18 && speed < 1.5) {
       this.gameState.ballInHole = true;
       this.gameState.gameComplete = true;
       
@@ -117,8 +125,21 @@ class Game {
         ? 'Hole in One! 🎉' 
         : `Hole Complete! ${this.gameState.strokes} strokes`;
       
-      this.uiManager.showMessage(message, 5000);
+      this.uiManager.showMessage(message, 3000);
+
+      // Reset after delay
+      setTimeout(() => this.resetCourse(), 3000);
     }
+  }
+
+  private async resetCourse(): Promise<void> {
+    this.gameState.strokes = 0;
+    this.gameState.ballInHole = false;
+    this.gameState.gameComplete = false;
+    this.uiManager.updateStrokeCount(0);
+
+    // Reset ball to tee position
+    await this.physicsManager.resetBall(0, 0.15, 4);
   }
 
   private gameLoop(): void {

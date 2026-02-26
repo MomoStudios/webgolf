@@ -98,6 +98,14 @@ export class PhysicsManager {
     return { x: velocity.x, y: velocity.y, z: velocity.z };
   }
 
+  public async resetBall(x: number, y: number, z: number): Promise<void> {
+    if (!this.ballBody) return;
+    const RAPIER = this.RAPIER;
+    this.ballBody.setTranslation(new RAPIER.Vector3(x, y, z), true);
+    this.ballBody.setLinvel(new RAPIER.Vector3(0, 0, 0), true);
+    this.ballBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
+  }
+
   public isBallStopped(): boolean {
     const velocity = this.getBallVelocity();
     const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
