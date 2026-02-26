@@ -66,8 +66,8 @@ class Game {
     const T = 0.12;
     const H = 0.3;
 
-    // Green
-    await this.physicsManager.createGreen(W, L);
+    // Green with physical hole cut-out at (0, -4), radius 0.18
+    await this.physicsManager.createGreen(W, L, 0, -4, 0.18);
 
     // Walls (left, right, back, front)
     await this.physicsManager.createWall(-(W / 2 + T / 2), H / 2, 0, T, H, L + T * 2);
@@ -106,18 +106,9 @@ class Game {
     if (this.gameState.ballInHole) return;
 
     const ballPos = this.physicsManager.getBallPosition();
-    const holePos = this.course.getHolePosition();
-    
-    const distance = Math.sqrt(
-      Math.pow(ballPos.x - holePos.x, 2) + 
-      Math.pow(ballPos.z - holePos.z, 2)
-    );
 
-    // Ball sinks if it rolls over the hole slowly enough
-    const vel = this.physicsManager.getBallVelocity();
-    const speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
-
-    if (distance < 0.18 && speed < 1.5) {
+    // Physics-based: ball dropped below the green surface (y < -0.05)
+    if (ballPos.y < -0.05) {
       this.gameState.ballInHole = true;
       this.gameState.gameComplete = true;
       
@@ -126,9 +117,12 @@ class Game {
         : `Hole Complete! ${this.gameState.strokes} strokes`;
       
       this.uiManager.showMessage(message, 3000);
-
-      // Reset after delay
       setTimeout(() => this.resetCourse(), 3000);
+    }
+
+    // Also check if ball fell off the course entirely
+    if (ballPos.y < -2) {
+      this.resetCourse();
     }
   }
 

@@ -32,16 +32,82 @@ export class PhysicsManager {
     return this.ballBody;
   }
 
-  public async createGreen(width: number, length: number): Promise<void> {
+  public async createGreen(width: number, length: number, holeX: number, holeZ: number, holeRadius: number): Promise<void> {
     const RAPIER = this.RAPIER;
-    const groundDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0.0, -0.05, 0.0);
-    const groundBody = this.world.createRigidBody(groundDesc);
-    
-    const groundCollider = RAPIER.ColliderDesc.cuboid(width / 2, 0.05, length / 2)
-      .setRestitution(0.2)
-      .setFriction(0.9);
-    
-    this.world.createCollider(groundCollider, groundBody);
+    const surfaceY = -0.05;
+    const halfH = 0.05;
+    const hr = holeRadius + 0.02; // slightly larger gap than visual hole
+
+    // Tile the green around the hole with 4 slabs
+    // Slab layout (hole at holeX, holeZ):
+    //  [  slab behind hole (far -Z side)  ]
+    //  [left]  (hole gap)  [right]
+    //  [  slab in front of hole (+Z side)  ]
+
+    const halfW = width / 2;
+    const halfL = length / 2;
+
+    // Behind hole: from -halfL to holeZ - hr
+    const behindLen = (holeZ - hr) - (-halfL);
+    if (behindLen > 0) {
+      const cz = (-halfL + (holeZ - hr)) / 2;
+      this.createFixedCuboid(0, surfaceY, cz, halfW, halfH, behindLen / 2, 0.2, 0.9);
+    }
+
+    // In front of hole: from holeZ + hr to +halfL
+    const frontLen = halfL - (holeZ + hr);
+    if (frontLen > 0) {
+      const cz = ((holeZ + hr) + halfL) / 2;
+      this.createFixedCuboid(0, surfaceY, cz, halfW, halfH, frontLen / 2, 0.2, 0.9);
+    }
+
+    // Left of hole: in the hole's Z band, from -halfW to holeX - hr
+    const leftWidth = (holeX - hr) - (-halfW);
+    if (leftWidth > 0) {
+      const cx = (-halfW + (holeX - hr)) / 2;
+      const cz = holeZ;
+      this.createFixedCuboid(cx, surfaceY, cz, leftWidth / 2, halfH, hr, 0.2, 0.9);
+    }
+
+    // Right of hole: in the hole's Z band, from holeX + hr to +halfW
+    const rightWidth = halfW - (holeX + hr);
+    if (rightWidth > 0) {
+      const cx = ((holeX + hr) + halfW) / 2;
+      const cz = holeZ;
+      this.createFixedCuboid(cx, surfaceY, cz, rightWidth / 2, halfH, hr, 0.2, 0.9);
+    }
+
+    // Cup: cylindrical walls + floor below surface
+    const cupDepth = 0.3;
+    const cupFloorY = surfaceY - cupDepth;
+
+    // Cup floor
+    this.createFixedCuboid(holeX, cupFloorY, holeZ, holeRadius, 0.02, holeRadius, 0.2, 0.9);
+
+    // Cup walls — use 8 thin cuboid slats arranged in a circle
+    const slats = 12;
+    const slatThickness = 0.02;
+    for (let i = 0; i < slats; i++) {
+      const angle = (i / slats) * Math.PI * 2;
+      const sx = holeX + Math.cos(angle) * holeRadius;
+      const sz = holeZ + Math.sin(angle) * holeRadius;
+      const wallBody = this.world.createRigidBody(
+        RAPIER.RigidBodyDesc.fixed().setTranslation(sx, surfaceY - cupDepth / 2, sz)
+      );
+      const wallCollider = RAPIER.ColliderDesc.cuboid(slatThickness, cupDepth / 2, slatThickness)
+        .setRestitution(0.1)
+        .setFriction(0.5);
+      this.world.createCollider(wallCollider, wallBody);
+    }
+  }
+
+  private createFixedCuboid(x: number, y: number, z: number, halfW: number, halfH: number, halfD: number, restitution: number, friction: number): void {
+    const RAPIER = this.RAPIER;
+    const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z));
+    const collider = RAPIER.ColliderDesc.cuboid(halfW, halfH, halfD)
+      .setRestitution(restitution)
+      .setFriction(friction);
+    this.world.createCollider(collider, body);
   }
 
   public async createWall(x: number, y: number, z: number, width: number, height: number, depth: number): Promise<void> {

@@ -101,25 +101,42 @@ export class Course {
   }
 
   private createHole(): void {
-    // Hole rim (dark circle)
-    const rimGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.02, 16);
-    const rimMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
-    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+    // Visual cup — open cylinder going below the green surface
+    const cupDepth = 0.3;
+    const cupRadius = 0.18;
+
+    // Cup interior (dark cylinder below surface)
+    const cupGeo = new THREE.CylinderGeometry(cupRadius, cupRadius, cupDepth, 16, 1, true);
+    const cupMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a, side: THREE.BackSide });
+    const cup = new THREE.Mesh(cupGeo, cupMat);
+    cup.position.set(0, -cupDepth / 2 + 0.05, Course.HOLE_Z);
+    this.scene.add(cup);
+
+    // Cup floor
+    const floorGeo = new THREE.CircleGeometry(cupRadius, 16);
+    const floorMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0.05 - cupDepth, Course.HOLE_Z);
+    this.scene.add(floor);
+
+    // Rim ring
+    const rimGeo = new THREE.TorusGeometry(cupRadius, 0.02, 8, 24);
+    const rimMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.rotation.x = -Math.PI / 2;
     rim.position.set(0, 0.06, Course.HOLE_Z);
     this.scene.add(rim);
 
-    // Hole (black center)
-    const holeGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 16);
-    const holeMaterial = new THREE.MeshLambertMaterial({ color: 0x000000 });
-    this.objects.hole = new THREE.Mesh(holeGeometry, holeMaterial);
+    // Invisible mesh for position tracking
+    this.objects.hole = new THREE.Mesh();
     this.objects.hole.position.set(0, 0.05, Course.HOLE_Z);
-    this.scene.add(this.objects.hole);
 
     // Flag pole
     const poleGeo = new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6);
     const poleMat = new THREE.MeshLambertMaterial({ color: 0xCCCCCC });
     const pole = new THREE.Mesh(poleGeo, poleMat);
-    pole.position.set(0, 0.6, Course.HOLE_Z);
+    pole.position.set(0.15, 0.6, Course.HOLE_Z);
     pole.castShadow = true;
     this.scene.add(pole);
 
@@ -137,7 +154,7 @@ export class Course {
       side: THREE.DoubleSide
     });
     const flag = new THREE.Mesh(flagGeo, flagMat);
-    flag.position.set(0, 1.2, Course.HOLE_Z);
+    flag.position.set(0.15, 1.2, Course.HOLE_Z);
     this.scene.add(flag);
   }
 
