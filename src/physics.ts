@@ -22,9 +22,6 @@ export class PhysicsManager {
     const RAPIER = this.RAPIER;
     const ballDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y, z);
     this.ballBody = this.world.createRigidBody(ballDesc);
-
-    // Enable CCD to prevent tunneling through thin walls
-    this.ballBody.setCcdEnabled(true);
     
     const ballCollider = RAPIER.ColliderDesc.ball(0.1) // Ball radius
       .setRestitution(0.4)
