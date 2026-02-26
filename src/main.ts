@@ -1,174 +1,146 @@
 import * as THREE from 'three';
-import { SceneManager } from './scene';
-import { PhysicsManager } from './physics';
-import { Course } from './course';
-import { ControlsManager } from './controls';
-import { UIManager } from './ui';
-import { GameState } from './types';
+import { Renderer } from './core/renderer';
+import { PhysicsManager } from './core/physics';
+import { buildCourseVisuals } from './course/builder-visual';
+import { buildCoursePhysics } from './course/builder-physics';
+import { hole01 } from './course/hole-01';
+import { BallController } from './gameplay/ball';
+import { isBallInHole, isBallOutOfBounds } from './gameplay/hole-detection';
+import { createStateMachine, GameStateKind, transition, canStartAim } from './gameplay/state-machine';
+import { InputManager } from './controls/input';
+import { AimLine } from './controls/aim';
+import { HUD } from './ui/hud';
 
 class Game {
-  private sceneManager!: SceneManager;
-  private physicsManager!: PhysicsManager;
-  private course!: Course;
-  private controlsManager!: ControlsManager;
-  private uiManager!: UIManager;
-  private gameState: GameState;
-  private animationId: number = 0;
+  private renderer!: Renderer;
+  private physics!: PhysicsManager;
+  private ball!: BallController;
+  private input!: InputManager;
+  private aimLine!: AimLine;
+  private hud!: HUD;
+  private sm = createStateMachine();
+  private animationId = 0;
+  private lastTime = 0;
 
   constructor() {
-    this.gameState = {
-      strokes: 0,
-      ballInHole: false,
-      isDragging: false,
-      gameComplete: false
-    };
-
     this.init();
   }
 
   private async init(): Promise<void> {
     try {
       const canvas = document.getElementById('canvas') as HTMLCanvasElement;
-      
-      // Initialize managers
-      this.sceneManager = new SceneManager(canvas);
-      this.physicsManager = new PhysicsManager();
-      await this.physicsManager.initialize();
-      this.course = new Course(this.sceneManager.scene);
-      this.uiManager = new UIManager();
 
-      // Setup physics world to match visual course
-      await this.setupPhysics();
+      this.renderer = new Renderer(canvas);
+      this.physics = new PhysicsManager();
+      await this.physics.initialize();
 
-      // Initialize controls — pass getBallPosition so aim line tracks the ball dynamically
-      this.controlsManager = new ControlsManager(
+      // Build visual course
+      const visuals = buildCourseVisuals(this.renderer.scene, hole01);
+
+      // Build physics course
+      buildCoursePhysics(this.physics.RAPIER, this.physics.world, hole01);
+
+      // Create physics ball
+      const ballBody = this.physics.createBall(hole01.tee.x, 0.15, hole01.tee.z);
+      this.ball = new BallController(visuals.ball, ballBody, this.physics.RAPIER);
+
+      this.hud = new HUD();
+      this.aimLine = new AimLine(this.renderer.scene, 15);
+
+      this.input = new InputManager(
         canvas,
-        this.sceneManager.camera,
-        this.sceneManager.scene,
-        this.handlePutt.bind(this),
-        () => this.course.getBallPosition()
+        this.renderer.camera,
+        () => this.sm.current,
+        () => this.ball.getPosition(),
+        (power, dir) => this.handlePutt(power, dir),
+        () => transition(this.sm, GameStateKind.Aiming),
+        () => {
+          const pts = this.input.getAimWorldPoints();
+          if (pts) this.aimLine.update(pts.start, pts.end, pts.power);
+          else this.aimLine.hide();
+        },
+        () => {
+          this.aimLine.hide();
+          if (canStartAim(this.sm)) transition(this.sm, GameStateKind.Idle);
+        },
       );
 
-      // Show initial message
-      this.uiManager.showMessage('Drag from the ball to aim and release to putt!', 4000);
-
-      // Start game loop
-      this.gameLoop();
+      this.hud.showMessage('Drag from the ball to aim and release to putt!', 4000);
+      this.lastTime = performance.now();
+      this.gameLoop(this.lastTime);
     } catch (e) {
       console.error('Game init failed:', e);
       document.body.innerHTML = `<div style="color:white;padding:20px;font-family:sans-serif"><h1>Init Error</h1><pre>${e}</pre></div>`;
     }
   }
 
-  private async setupPhysics(): Promise<void> {
-    const W = 3;   // Course.WIDTH
-    const L = 10;  // Course.LENGTH
-    const T = 0.12;
-    const H = 0.3;
+  private handlePutt(power: number, direction: THREE.Vector2): void {
+    if (this.sm.current !== GameStateKind.Aiming) return;
 
-    // Green with physical hole cut-out at (0, -4), radius 0.18
-    await this.physicsManager.createGreen(W, L, 0, -4, 0.18);
-
-    // Walls (left, right, back, front)
-    await this.physicsManager.createWall(-(W / 2 + T / 2), H / 2, 0, T, H, L + T * 2);
-    await this.physicsManager.createWall((W / 2 + T / 2), H / 2, 0, T, H, L + T * 2);
-    await this.physicsManager.createWall(0, H / 2, -(L / 2 + T / 2), W + T * 2, H, T);
-    await this.physicsManager.createWall(0, H / 2, (L / 2 + T / 2), W + T * 2, H, T);
-
-    // Bumpers
-    await this.physicsManager.createObstacle(-0.6, H / 2, -1, 0.15);
-    await this.physicsManager.createObstacle(0.6, H / 2, 0.5, 0.15);
-
-    // Ball at tee
-    await this.physicsManager.createBall(0, 0.15, 4);
-  }
-
-  private async handlePutt(power: number, direction: THREE.Vector2): Promise<void> {
-    if (this.gameState.gameComplete || !this.physicsManager.isBallStopped()) {
-      return;
-    }
-
-    // Convert 2D direction to 3D physics impulse
-    // Exponential power curve — fine control for short putts, ramps up for power shots
     const maxPower = 15;
-    const normalizedPower = power / maxPower; // 0..1
+    const normalizedPower = power / maxPower;
     const impulseStrength = 0.2 * (normalizedPower * normalizedPower) * maxPower;
-    const impulseX = direction.x * impulseStrength;
-    const impulseZ = direction.y * impulseStrength;
 
-    await this.physicsManager.applyImpulse(impulseX, impulseZ);
-    
-    this.gameState.strokes++;
-    this.uiManager.updateStrokeCount(this.gameState.strokes);
+    this.ball.applyImpulse(direction.x * impulseStrength, direction.y * impulseStrength);
+    this.sm.strokes++;
+    this.hud.updateStrokeCount(this.sm.strokes);
+    transition(this.sm, GameStateKind.Rolling);
   }
 
-  private checkBallInHole(): void {
-    if (this.gameState.ballInHole) return;
+  private gameLoop(now: number): void {
+    this.animationId = requestAnimationFrame((t) => this.gameLoop(t));
 
-    const ballPos = this.physicsManager.getBallPosition();
+    const dt = Math.min((now - this.lastTime) / 1000, 0.1);
+    this.lastTime = now;
 
-    // Physics-based: ball dropped below the green surface (y < -0.05)
-    if (ballPos.y < -0.05) {
-      this.gameState.ballInHole = true;
-      this.gameState.gameComplete = true;
-      
-      const message = this.gameState.strokes === 1 
-        ? 'Hole in One! 🎉' 
-        : `Hole Complete! ${this.gameState.strokes} strokes`;
-      
-      this.uiManager.showMessage(message, 3000);
-      setTimeout(() => this.resetCourse(), 3000);
+    this.physics.step(dt);
+    this.ball.syncVisual();
+
+    this.updateGameState();
+    this.renderer.render();
+  }
+
+  private updateGameState(): void {
+    const state = this.sm.current;
+
+    if (state === GameStateKind.Rolling) {
+      // Force-stop if slow
+      const stopped = this.ball.forceStopIfSlow(0.05);
+      if (stopped) {
+        transition(this.sm, GameStateKind.Idle);
+      }
+
+      // Hole detection
+      if (isBallInHole(this.ball)) {
+        transition(this.sm, GameStateKind.Scored);
+        const msg = this.sm.strokes === 1
+          ? 'Hole in One! 🎉'
+          : `Hole Complete! ${this.sm.strokes} strokes`;
+        this.hud.showMessage(msg, 3000);
+        setTimeout(() => this.resetCourse(), 3000);
+        return;
+      }
+
+      // Out of bounds
+      if (isBallOutOfBounds(this.ball)) {
+        this.resetCourse();
+        return;
+      }
     }
-
-    // Also check if ball fell off the course entirely
-    if (ballPos.y < -2) {
-      this.resetCourse();
-    }
   }
 
-  private async resetCourse(): Promise<void> {
-    this.gameState.strokes = 0;
-    this.gameState.ballInHole = false;
-    this.gameState.gameComplete = false;
-    this.uiManager.updateStrokeCount(0);
-
-    // Reset ball to tee position
-    await this.physicsManager.resetBall(0, 0.15, 4);
-  }
-
-  private gameLoop(): void {
-    // Physics step
-    this.physicsManager.step();
-
-    // Update ball visual position from physics
-    const ballPos = this.physicsManager.getBallPosition();
-    this.course.updateBallPosition(ballPos.x, ballPos.y, ballPos.z);
-
-    // Check game conditions
-    this.checkBallInHole();
-
-    // Render
-    this.sceneManager.render();
-
-    // Continue loop
-    this.animationId = requestAnimationFrame(() => this.gameLoop());
+  private resetCourse(): void {
+    this.sm.strokes = 0;
+    transition(this.sm, GameStateKind.Idle);
+    this.hud.updateStrokeCount(0);
+    this.ball.reset(hole01.tee.x, 0.15, hole01.tee.z);
   }
 
   public destroy(): void {
-    if (this.animationId) {
-      cancelAnimationFrame(this.animationId);
-    }
+    cancelAnimationFrame(this.animationId);
   }
 }
 
-// Initialize game when page loads and store on window for debugging
 window.addEventListener('load', () => {
-  window.game = new Game();
+  (window as unknown as Record<string, unknown>)['game'] = new Game();
 });
-
-// Expose game globally for debugging
-declare global {
-  interface Window {
-    game: Game;
-  }
-}
