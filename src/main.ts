@@ -111,7 +111,7 @@ class Game {
       }
 
       // Hole detection
-      if (isBallInHole(this.ball)) {
+      if (isBallInHole(this.ball, hole01)) {
         transition(this.sm, GameStateKind.Scored);
         const msg = this.sm.strokes === 1
           ? 'Hole in One! 🎉'
