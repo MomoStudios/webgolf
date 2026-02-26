@@ -10,10 +10,36 @@ export function buildCourseVisuals(scene: THREE.Scene, def: HoleDef): CourseVisu
   const WALL_H = 0.3;
   const WALL_T = 0.12;
 
-  // Green
-  const greenGeo = new THREE.BoxGeometry(def.width, 0.1, def.length);
+  // Green — flat plane with circular hole cut out
+  const greenShape = new THREE.Shape();
+  const hw = def.width / 2;
+  const hl = def.length / 2;
+  // Outer rectangle (in XZ mapped to shape's XY)
+  greenShape.moveTo(-hw, -hl);
+  greenShape.lineTo(hw, -hl);
+  greenShape.lineTo(hw, hl);
+  greenShape.lineTo(-hw, hl);
+  greenShape.lineTo(-hw, -hl);
+
+  // Circular hole cut-out
+  const holePath = new THREE.Path();
+  const holeSegs = 24;
+  const cr = def.holeRadius + 0.02; // slightly larger than physics gap
+  for (let i = 0; i <= holeSegs; i++) {
+    const a = (i / holeSegs) * Math.PI * 2;
+    const px = def.hole.x + Math.cos(a) * cr;
+    const pz = def.hole.z + Math.sin(a) * cr;
+    if (i === 0) holePath.moveTo(px, pz);
+    else holePath.lineTo(px, pz);
+  }
+  greenShape.holes.push(holePath);
+
+  const greenGeo = new THREE.ShapeGeometry(greenShape, 1);
+  // ShapeGeometry lies in XY — rotate to XZ
+  greenGeo.rotateX(-Math.PI / 2);
   const greenMat = new THREE.MeshLambertMaterial({ color: 0x4caf50, flatShading: true });
   const green = new THREE.Mesh(greenGeo, greenMat);
+  green.position.y = 0.05; // surface level
   green.receiveShadow = true;
   scene.add(green);
 
