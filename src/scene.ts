@@ -24,8 +24,8 @@ export class SceneManager {
       1000
     );
     
-    // Fixed top-down camera at ~45° angle
-    this.camera.position.set(0, 12, 8);
+    // Fixed top-down camera at ~45° angle, framing the narrow fairway
+    this.camera.position.set(0, 10, 8);
     this.camera.lookAt(0, 0, 0);
   }
 

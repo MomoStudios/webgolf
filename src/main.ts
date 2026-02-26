@@ -61,21 +61,26 @@ class Game {
   }
 
   private async setupPhysics(): Promise<void> {
-    // Create physics bodies to match visual objects
-    await this.physicsManager.createGreen(12, 8);
-    
-    // Create walls
-    await this.physicsManager.createWall(0, 0.25, -4.05, 12.1, 0.5, 0.1); // Back
-    await this.physicsManager.createWall(0, 0.25, 4.05, 12.1, 0.5, 0.1);  // Front
-    await this.physicsManager.createWall(-6.05, 0.25, 0, 0.1, 0.5, 8.1);  // Left
-    await this.physicsManager.createWall(6.05, 0.25, 0, 0.1, 0.5, 8.1);   // Right
-    
-    // Curved obstacles (cylinder physics to match visual cylinders)
-    await this.physicsManager.createObstacle(-4, 0.25, -2, 0.8);
-    await this.physicsManager.createObstacle(3, 0.25, 1, 0.6);
+    const W = 3;   // Course.WIDTH
+    const L = 10;  // Course.LENGTH
+    const T = 0.12;
+    const H = 0.3;
 
-    // Create ball
-    await this.physicsManager.createBall(-4, 0.2, 2);
+    // Green
+    await this.physicsManager.createGreen(W, L);
+
+    // Walls (left, right, back, front)
+    await this.physicsManager.createWall(-(W / 2 + T / 2), H / 2, 0, T, H, L + T * 2);
+    await this.physicsManager.createWall((W / 2 + T / 2), H / 2, 0, T, H, L + T * 2);
+    await this.physicsManager.createWall(0, H / 2, -(L / 2 + T / 2), W + T * 2, H, T);
+    await this.physicsManager.createWall(0, H / 2, (L / 2 + T / 2), W + T * 2, H, T);
+
+    // Bumpers
+    await this.physicsManager.createObstacle(-0.6, H / 2, -1, 0.15);
+    await this.physicsManager.createObstacle(0.6, H / 2, 0.5, 0.15);
+
+    // Ball at tee
+    await this.physicsManager.createBall(0, 0.15, 4);
   }
 
   private async handlePutt(power: number, direction: THREE.Vector2): Promise<void> {
@@ -84,7 +89,7 @@ class Game {
     }
 
     // Convert 2D direction to 3D physics impulse
-    const impulseStrength = power * 0.05;
+    const impulseStrength = power * 0.0125;
     const impulseX = direction.x * impulseStrength;
     const impulseZ = direction.y * impulseStrength;
 
